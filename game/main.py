@@ -15,16 +15,18 @@ import os
 import random
 import time
 from typing import NamedTuple
+from combat import Battle
 from common import EnumObject, remap_dict, try_append
 import cuinter
 from cuinter import UI_ELEMENT_CLASSES
 from enums import EVENT_TYPES, UI_ELEMENT_TYPES, RECTANGLE_PRESETS
 from files import load_text_dir, load_pickle, save_pickle
-from game_classes import Character, Item, Stats
+from game_classes import Action, Character, Item, Party
+from game_save import GameSave
 from lang import DialogLine, translate
 import monsters
-from save import Save
 import settings
+from uuid import UUID
 import world
 from world import WORLD_OBJECT_CLASSES
 
@@ -46,7 +48,7 @@ logging.basicConfig(
     filemode="w",
     encoding="utf-8",
     level=logging.DEBUG,
-    format="%(name)-8s :: %(levelname)-8s :: %(message)s",
+    format="%(name)-9s :: %(levelname)-8s :: %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -55,16 +57,15 @@ fps_timer = last_time  # Time of the last FPS update
 frame_count = 0
 
 settings.load()
+current_save = None
+current_zone_path = None
+battle_action = None
+battle_target = None
 
 tiles = load_text_dir(TILE_SPRITE_DIR_PATH)
 tileset = remap_dict(tiles, world.TILE_NAME_TO_CHAR)
 
 grid = world.Grid.new(tileset)
-
-nb_save = len(os.listdir("user_data\\game_saves"))
-current_save = None
-
-current_zone_path = None
 player = world.WorldCharacter.new(
     grid=grid,
     grid_y=0,
@@ -74,7 +75,6 @@ player = world.WorldCharacter.new(
     y_offset=-1,
     x_offset=0,
 )
-
 fps_label = cuinter.Label.new(0, 0)
 
 world_objects = []
@@ -146,7 +146,6 @@ while 1:
                                 new_events,
                                 world_object.on_walk(player.grid_y, player.grid_x),
                             )
-                    logger.debug(f"Now the position is {(player.grid_x, player.grid_y)}")
                 
                 elif value == ord("m"):
                     try_append(
@@ -156,7 +155,6 @@ while 1:
                             MENU_CHOICE_PATH,
                         ),
                     )
-                
             
             case EVENT_TYPES.MAKE_UI_ELEMENT:
                 if not isinstance(value, EnumObject):
@@ -233,18 +231,19 @@ while 1:
                 
                 zone_path, player_grid_y, player_grid_x = value
                 zone_data = load_pickle(zone_path)
-                logger.debug(f"{zone_path}")
                 if zone_data is None:
                     continue
                 
                 tilemap, world_objects_constructors = zone_data
                 
+                current_zone_path = zone_path
                 grid = grid.load_tilemap(tilemap)
                 grid = grid.center(cuinter.screen_height, cuinter.screen_width)
-                
-                current_zone_path = zone_path
-                player = player.config(grid=grid, grid_y=player_grid_y, grid_x=player_grid_x)
-                
+                player = player.config(
+                    grid=grid,
+                    grid_y=player_grid_y,
+                    grid_x=player_grid_x,
+                )
                 
                 world_objects.clear()
                 for constructor in world_objects_constructors:
@@ -254,53 +253,226 @@ while 1:
                     )
                     try_append(new_events, new_event)
             
-            case EVENT_TYPES.LOAD_COMBAT:
+            case EVENT_TYPES.LOAD_BATTLE:
                 if not isinstance(value, str):
                     logger.error(f"Expected value of type str, got {value}")
                     continue
                 
-                combat_data = load_pickle(zone_path)
-                if combat_data is None:
-                    continue
+                #TODO load battle_data and plug into Battle.new()
                 
-                logger.error("Not implemented: EVENT_TYPES.LOAD_COMBAT")
+                grid = grid.config(
+                    y=cuinter.screen_height,
+                    x=cuinter.screen_width,
+                )
+                world_objects = [world_object.config(grid=grid) for world_object in world_objects]
+                player = player.config(grid=grid)
+                
+                chief = monsters.GoblinChief()
+                battle = Battle.new(
+                    Party(
+                        name="Player party",
+                        members=(player.character,),
+                        leader=player.character.uuid,
+                    ),
+                    Party(
+                        name="Goblin squad",
+                        members=(
+                            chief,
+                            monsters.Hobgoblin(),
+                            monsters.Goblin(),
+                        ),
+                        leader=chief.uuid,
+                    ),
+                )
+                
+                #try_append(new_events, battle.advance())
             
-            case EVENT_TYPES.CONFIG_SETTINGS:
-                if not isinstance(value, dict):
-                    logger.error(f"Expected value of type dict, got {value}")
+            case EVENT_TYPES.SET_BATTLE_ACTION:
+                if not isinstance(value, Action):
+                    logger.error(f"Expected value of type Action, got {value}")
                     continue
                 
-                settings.config(**value)
+                if battle_target is not None:
+                    #try_append(new_events, battle.advance(value, battle_target))
+                    battle_target = None
+                else:
+                    battle_action = value
+            
+            case EVENT_TYPES.SET_BATTLE_TARGET:
+                if not isinstance(value, UUID):
+                    logger.error(f"Expected value of type UUID, got {value}")
+                    continue
+                
+                if battle_action is not None:
+                    #try_append(new_events, battle.advance(battle_action, value))
+                    battle_action = None
+                else:
+                    battle_target = value
+            
+            case EVENT_TYPES.EQUIP_ITEM:
+                if (not isinstance(value, tuple)
+                or len(value) != 2
+                or not isinstance(value[0], str)
+                or not isinstance(value[1], Item)):
+                    logger.error(f"Expected value of type tuple[str, Item], got {value}")
+                    continue
+                
+                player = player.config(character=player.character.equip(*value))
+            
+            case EVENT_TYPES.UNEQUIP_ITEM:
+                if not isinstance(value, str):
+                    logger.error(f"Expected value of type str, got {value}")
+                    continue
+                
+                player = player.config(character=player.character.unequip(value))
+            
+            case EVENT_TYPES.ADD_ITEM:
+                if (not isinstance(value, Item)
+                and (not isinstance(value, tuple)
+                or len(value) != 2
+                or not isinstance(value[0], Item)
+                or not isinstance(value[1], int))):
+                    logger.error(f"Expected value of type Item | tuple[Item, int], got {value}")
+                    continue
+                
+                if isinstance(value, tuple):
+                    player.character.inventory.add(*value)
+                else:
+                    player.character.inventory.add(value)
+            
+            case EVENT_TYPES.REMOVE_ITEM:
+                if (not isinstance(value, Item)
+                and (not isinstance(value, tuple)
+                or len(value) != 2
+                or not isinstance(value[0], Item)
+                or not isinstance(value[1], int))):
+                    logger.error(f"Expected value of type Item | tuple[Item, int], got {value}")
+                    continue
+                
+                if isinstance(value, tuple):
+                    player.character.inventory.remove(*value)
+                else:
+                    player.character.inventory.remove(value)
+            
+            case EVENT_TYPES.USE_ITEM:
+                if not isinstance(value, Item):
+                    logger.error(f"Expected value of type Item, got {value}")
+                    continue
+                
+                logger.error("Not implemented: EVENT_TYPES.USE_ITEM")
             
             case EVENT_TYPES.OPEN_ITEM:
                 if not isinstance(value, Item):
                     logger.error(f"Expected value of type Item, got {value}")
                     continue
                 
-                logger.debug("Opened item")
-                logger.error("Not implemented: EVENT_TYPES.OPEN_ITEM")
+                logger.debug("Opening item")
+                
+                item = value
+                inventory = player.character.inventory
+                options = ()
+                on_confirm_events = {}
+                
+                if "equippable" in item.tags:
+                    for slot_name in inventory.slots:
+                        if slot_name not in item.tags:
+                            continue
+                        elif (inventory.equipment[slot_name] is not None
+                        and item.name == inventory.equipment[slot_name].name):
+                            equip_entry = translate("item_unequip")
+                            on_confirm_event = EnumObject(
+                                EVENT_TYPES.UNEQUIP_ITEM,
+                                slot_name,
+                            )
+                        else:
+                            for it, count in inventory.backpack.items():
+                                if it.name != item.name or count < 1:
+                                    continue
+                                equip_entry = translate("item_equip")
+                                on_confirm_event = EnumObject(
+                                    EVENT_TYPES.EQUIP_ITEM,
+                                    (
+                                        slot_name,
+                                        it,
+                                    ),
+                                )
+                                break
+                            else:
+                                continue
+                        
+                        equip_entry += f" {item.display_name}: {translate('equipment_slots.' + slot_name)}"
+                        options += (equip_entry,)
+                        on_confirm_events[len(options) - 1] = EnumObject(
+                            EVENT_TYPES.MULTI_EVENT,
+                            (
+                                on_confirm_event,
+                                EnumObject(
+                                    EVENT_TYPES.OPEN_ITEM,
+                                    item,
+                                ),
+                            ),
+                        )
+                            
+                elif "consumable" in item.tags:
+                    if inventory.backpack[item] > 1:
+                        on_use_event = EnumObject(
+                            EVENT_TYPES.OPEN_ITEM,
+                            item,
+                        )
+                    else:
+                        on_use_event = EnumObject(
+                            EVENT_TYPES.OPEN_BACKPACK,
+                        )
+                    options += (f"{translate('item_use')} {item.display_name}",)
+                    on_confirm_events[len(options) - 1] = EnumObject(
+                        EVENT_TYPES.MULTI_EVENT,
+                        (
+                            EnumObject(
+                                EVENT_TYPES.USE_ITEM,
+                                item,
+                            ),
+                            on_use_event,
+                        ),
+                    )
+                
+                options += (translate("menu_back"),)
+                on_confirm_events[len(options) - 1] = EnumObject(
+                    EVENT_TYPES.OPEN_BACKPACK,
+                )
+                
+                cuinter.ChoiceBox.new(
+                    options=options,
+                    on_confirm_events=on_confirm_events,
+                    rectangle_preset=RECTANGLE_PRESETS.MENU,
+                )
             
             case EVENT_TYPES.OPEN_EQUIPMENT:
-                logger.debug("Opened equipment")
+                logger.debug("Opening equipment")
                 
-                equipment = player.character.inventory.equipment
+                slot_items = player.character.inventory.equipment.items()
                 options = ()
-                for slot_name, equiped_item in equipment.items():
+                on_confirm_events = {}
+                
+                for i, (slot_name, item) in enumerate(slot_items):
                     slot_entry = translate("equipment_slots." + slot_name) + ": "
-                    if equiped_item is None:
-                        slot_entry += translate("none")
+                    if item is None:
+                        slot_entry += translate("equipment_none")
+                        on_confirm_events[i] = EnumObject(
+                            EVENT_TYPES.OPEN_BACKPACK,
+                        )
                     else:
-                        slot_entry += equiped_item.display_name
+                        slot_entry += item.display_name
+                        on_confirm_events[i] = EnumObject(
+                            EVENT_TYPES.OPEN_ITEM,
+                            item,
+                        )
                     options += (slot_entry,)
                     
                 options += (translate("menu_back"),)
-                
-                on_confirm_events = {
-                    len(options) - 1: EnumObject(
-                        EVENT_TYPES.LOAD_UI_ELEMENT,
-                        "assets\\choices\\menu_choice.pkl",
-                    ),
-                }
+                on_confirm_events[len(options) - 1] = EnumObject(
+                    EVENT_TYPES.LOAD_UI_ELEMENT,
+                    "assets\\choices\\menu_choice.pkl",
+                )
                 
                 cuinter.ChoiceBox.new(
                     options=options,
@@ -309,17 +481,27 @@ while 1:
                 )
             
             case EVENT_TYPES.OPEN_BACKPACK:
-                logger.debug("Opened backpack")
+                logger.debug("Opening backpack")
                 
-                items = player.character.inventory.backpack.elements()
-                options = tuple(item.display_name for item in items)
+                item_counts = sorted(player.character.inventory.backpack.items())
+                options = ()
+                on_confirm_events = {}
+                
+                for i, (item, count) in enumerate(item_counts):
+                    item_entry = item.display_name
+                    if count > 1:
+                        item_entry += f" × {count}"
+                    options += (item_entry,)
+                    on_confirm_events[i] = EnumObject(
+                        EVENT_TYPES.OPEN_ITEM,
+                        item,
+                    )
+                
                 options += (translate("menu_back"),)
-                on_confirm_events = {
-                    len(options) - 1: EnumObject(
-                        EVENT_TYPES.LOAD_UI_ELEMENT,
-                        "assets\\choices\\menu_choice.pkl",
-                    ),
-                }
+                on_confirm_events[len(options) - 1] = EnumObject(
+                    EVENT_TYPES.LOAD_UI_ELEMENT,
+                    "assets\\choices\\menu_choice.pkl",
+                )
                 
                 cuinter.ChoiceBox.new(
                     options=options,
@@ -327,37 +509,40 @@ while 1:
                     rectangle_preset=RECTANGLE_PRESETS.MENU,
                 )
             
-            case EVENT_TYPES.SAVE_GAME:
-                logger.debug("Saved game")
+            case EVENT_TYPES.CONFIG_SETTINGS:
+                if not isinstance(value, dict):
+                    logger.error(f"Expected value of type dict, got {value}")
+                    continue
                 
-                current_save = Save(player.character, (current_zone_path, player.grid_y, player.grid_x))
+                settings.config(**value)
+            
+            case EVENT_TYPES.SAVE_GAME:
+                logger.debug("Saving game")
+                
+                current_save = GameSave(
+                    player.character,
+                    current_zone_path,
+                    player.grid_y,
+                    player.grid_x,
+                )
                 save_pickle(current_save, "user_data\\game_saves\\save_1.pkl")
             
             case EVENT_TYPES.LOAD_GAME:
-                logger.debug("Loaded game")
+                logger.debug("Loading game")
                 
-                if nb_save <= 0:
-                    current_save = Save.new(
-                        monsters.Player(),
-                        (
-                            "assets\\zones\\test_zone.pkl",
-                            1,
-                            2
-                        ),
-                    )
-                    save_pickle(current_save, "user_data\\game_saves\\save_1.pkl")
-                    current_zone_path = current_save.worldPosition[0]
+                if os.path.exists("user_data\\game_saves\\save_1.pkl"):
+                    current_save = load_pickle("user_data\\game_saves\\save_1.pkl")
+                else:
+                    current_save = GameSave.new()
                 
-                current_save = load_pickle("user_data\\game_saves\\save_1.pkl")
-                logger.debug(current_save.character.sprite_sheet)
-                player = player.config(
-                    character=current_save.character,
-                    grid_y=current_save.worldPosition[1],
-                    grid_x=current_save.worldPosition[2],
-                )
+                player = player.config(character=current_save.character)
                 new_event = EnumObject(
                     EVENT_TYPES.LOAD_ZONE,
-                    current_save.worldPosition,
+                    (
+                        current_save.zone_path,
+                        current_save.player_grid_y,
+                        current_save.player_grid_x,
+                    ),
                 )
                 
                 try_append(new_events, new_event)

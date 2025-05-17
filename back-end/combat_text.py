@@ -3,16 +3,16 @@
 Created on 2025.03.12
 Contributors:
     Jakub
-    Romain (just did implementation with the rest)
 """
 
 
 from __future__ import annotations
 from typing import NamedTuple
+from get_input import get_input
 import random as r
 import time
 from lang import translate, f
-from game_classes import Stats, DamageInstance, Character, Action, Party, Item, CharacterNotFoundError
+from game_classes import Stats, DamageInstance, Character, Action, Party, CharacterNotFoundError
 import monsters as m
 import test_items as ti
 from uuid import UUID
@@ -20,7 +20,7 @@ import logging
 
 
 combat_log = logging.getLogger(__name__)
-auto_turn_delay = 0.5 # seconds
+#auto_turn_delay = 0.5 # seconds
 
 
 combat_log.debug(" combat.py loaded")
@@ -44,19 +44,6 @@ class CombatParty(NamedTuple):
         combat_log.debug(f" {name} members:\n\n{members}\n\nleader: {leader}\n")
 
         return CombatParty(name, members, leader)
-
-
-    def to_party(self) -> Party:
-        name = self.name
-        leader = self.leader
-
-        members = []
-        for member in self.members:
-            if member[1]:
-                members.append(member[0])
-            else:
-                continue
-        return Party(name, tuple(members), leader)
 
 
     def get_member(self, member_uuid: UUID) -> Character:
@@ -114,7 +101,6 @@ class Battle(NamedTuple):
     team2: CombatParty
 
     turn_order: list[UUID]
-    progress: dict[str, int]
 
 
     def get_teams(self, fighter_uuid: UUID) -> (CombatParty, CombatParty):
@@ -145,25 +131,17 @@ class Battle(NamedTuple):
         # doesn't need to be sorted until the battle begins
         turn_order = targets1 + targets2
 
-        progress = {
-            "turn": 0,
-            "turn_progress": 0,
-            }
-
-        return Battle(combat_team1, combat_team2, turn_order, progress)
+        return Battle(combat_team1, combat_team2, turn_order)
 
 
     @staticmethod
-    def attack(attacker: Character, weapon: Item, attack: Action, victim: Character
+    def attack(attacker: Character, attack: Action, victim: Character
                ) -> (Character, Character, int):
-        """Determine the result of an interaction during combat."""
+        """Determine the result of an intercation during combat."""
 
-        # combat_log.debug(f" {attack.get_damage}")
-        # combat_log.debug(f" {attack.get_damage(weapon, attacker.current)}, {attack.damage_type}, {attack.effects}")
 
-        hit = DamageInstance(attack.get_damage(weapon, attacker.current), attack.damage_type, attack.effects)
-
-        victim, damage_taken = victim.hit(hit)
+        victim, damage_taken = victim.hit(DamageInstance(attack.get_damage(),
+                               attack.damage_type, attack.effects))
 
         # returning the attacker too if we ever do thorns damage
         return attacker, victim, damage_taken
@@ -193,17 +171,12 @@ class Battle(NamedTuple):
         """Get the player's choice of action and action target."""
         combat_log.debug(" Getting player input")
 
-        print()
-
-        # U G L Y
         action_names = []
         for action in player.actions:
-            weapon = player.inventory.find_equipped_item(action[0])
-            action_names.append(action[1].display(weapon, player.current))
+            action_names.append(action[1])
         list_choices(action_names, translate("combat.action_choice").format(player.name))
         action_index = get_input(int, True, (1, len(player.actions)))
         action = player.actions[action_index-1][1]
-        weapon = player.inventory.find_equipped_item(player.actions[action_index-1][0])
         combat_log.debug(f" Player chooses to use <{action.name}>")
 
         enemies_actual = []
@@ -214,7 +187,7 @@ class Battle(NamedTuple):
         enemy_uuid = enemies.valid_targets[enemy_index-1]
         combat_log.debug(f" Player chooses to attack {self.get_fighter(enemy_uuid)} ({enemy_uuid})")
 
-        return action, weapon, enemy_uuid
+        return action, enemy_uuid
 
 
     def begin(self) -> None:
@@ -226,95 +199,32 @@ class Battle(NamedTuple):
 
         self._sort_turn_order()
         is_fight_on = True
-        time.sleep(auto_turn_delay)
-        self.new_turn()
+        turn = 0
+        #time.sleep(0.5)
 
-        # is this allowed?
-        if __name__ == "__main__":
-            while is_fight_on:
-                self.advance(None)
-                # why is the delay broken?
-                time.sleep(auto_turn_delay)
+        while is_fight_on:
+            turn += 1
+            combat_log.info(f" Turn {turn} started")
 
-
-    def new_turn(self) -> int:
-        self.progress["turn"] += 1
-        self.progress["turn_progress"] = 0
-        turn = self.progress["turn"]
-        combat_log.info(f" Turn {turn} started")
-
-        for fighter_uuid in self.turn_order:
-            if self.get_fighter(fighter_uuid).is_alive:
-                continue
-            else:
-                self.turn_order.remove(fighter_uuid)
-
-        print()
-        print("====================")
-        print(f(translate("combat.turn"), turn))
-        time.sleep(2*auto_turn_delay)
-
-
-    def check_win_loss_conditions(self) -> int:
-        if len(self.team1.valid_targets) == 0:
-            combat_log.info(" Battle ends as player loss")
             print()
-            print(translate("combat.loss"))
-            is_fight_on = False
-            return -1
-        elif len(self.team2.valid_targets) == 0:
-            combat_log.info(" Battle ends as player victory")
-            print()
-            print(translate("combat.win"))
-            print(f(translate("combat.rewards"), "0", "0"))
-            is_fight_on = False
-            return 1
-        else:
-            return 0
+            print("====================")
+            print(f(translate("combat.turn"), turn))
+            #time.sleep(2*auto_turn_delay)
 
-
-    def advance(self, player_choice) -> object:
-        player_action_resolved = False
-
-        while True:
-            turn_progress = self.progress["turn_progress"]
-            if turn_progress < len(self.turn_order):
-                # Setup stuff
-                fighter_uuid = self.turn_order[turn_progress]
-
+            for fighter_uuid in self.turn_order:
                 allies, enemies = self.get_teams(fighter_uuid)
-                fighter = allies.get_member(fighter_uuid)
-                if not fighter.is_alive:
-                    # needed because turn_order is only cleaned at the end of a turn
-                    self.progress["turn_progress"] += 1
-                    continue
 
+                fighter = allies.get_member(fighter_uuid)
                 combat_log.info(f" {fighter} starts their turn")
 
+                # pick action and target
                 if fighter.is_player:
-                    # TODO: Handle player
-                    # pretty sure multiple PCs are supported
-
-                    # player_action_resolved dictates whether the data in...
-                    # player_choice is for this turn or the previous one
-                    if player_action_resolved or player_choice is None:
-                        # here, fighter is the current state of the player character
-                        return_data = (fighter, allies, enemies)
-                        raise NotImplementedError("Ask Mr. Frontend for player choice")
-
-                        # built-in player input handler (fallback?)
-                        attack, weapon, target_uuid = self.get_player_action(fighter, allies, enemies)
-                    else:
-                        attack, weapon, target_uuid = player_choice
-                        player_action_resolved = True
-
+                    print()
+                    attack, target_uuid = self.get_player_action(fighter, allies, enemies)
                 else:
-                    # Handle NPCs
                     # TODO: Implement better NPC AI
                     attack_action_source, attack = r.choice(fighter.actions)
                     target_uuid = r.choice(enemies.valid_targets)
-                    weapon = fighter.inventory.find_equipped_item(attack_action_source)
-
                 target = enemies.get_member(target_uuid)
 
                 # Resolve attack
@@ -322,7 +232,7 @@ class Battle(NamedTuple):
                 print()
                 print(f(translate("combat.attack"), fighter, attack.display_name, target))
 
-                fighter, target, damage_dealt = Battle.attack(fighter, weapon, attack, target)
+                fighter, target, damage_dealt = Battle.attack(fighter, attack, target)
 
                 combat_log.info(f" {target.name} takes ¤ {damage_dealt} damage -> ♥ {target.health}")
                 print(f(translate("combat.damage"), target.name, damage_dealt, target.health))
@@ -335,26 +245,24 @@ class Battle(NamedTuple):
                 if not target.is_alive:
                     combat_log.info(f" {target.name} dies")
                     print(f(translate("combat.death"), target.name))
-                    # self.turn_order.remove(target_uuid)
+                    self.turn_order.remove(target_uuid)
 
-                    match self.check_win_loss_conditions():
-                        case 0:
-                            # nothing happens
-                            pass
-                        case 1:
-                            updated_party = self.team1.to_party()
-                            raise NotImplementedError("Tell Mr Frontend that we won :)")
-                        case -1:
-                            raise NotImplementedError("Tell Mr Frontend that we lost :(")
-                        case _:
-                            raise NotImplementedError("How did we get here?")
+                    if len(self.team1.valid_targets) == 0:
+                        combat_log.info(" Battle ends as player loss")
+                        print()
+                        print(translate("combat.loss"))
+                        is_fight_on = False
+                        break
 
+                    elif len(self.team2.valid_targets) == 0:
+                        combat_log.info(" Battle ends as player victory")
+                        print()
+                        print(translate("combat.win"))
+                        print(f(translate("combat.rewards"), "0", "0"))
+                        is_fight_on = False
+                        break
 
-
-                self.progress["turn_progress"] += 1
-            else:
-                self.new_turn()
-                continue
+                #time.sleep(auto_turn_delay)
 
 
     def __repr__(self) -> str:
@@ -364,11 +272,11 @@ class Battle(NamedTuple):
 def list_choices(choices: list | tuple, text: str="", start_from_1: bool=True,
                  template: str="{}) {}") -> None:
 
-    print(text)
-    for i, choice in enumerate(choices):
-        if choice is None:
-            continue
-        print(template.format(i + start_from_1, choice))
+	print(text)
+	for i, choice in enumerate(choices):
+		if choice is None:
+			continue
+		print(template.format(i + start_from_1, choice))
 
 
 def _test_pcs():
@@ -394,10 +302,8 @@ def _test_pcs():
             initial_effects = {}
             )
     bob.inventory.add(ti.Sword)
-    bob.inventory.add(ti.Dagger)
     bob.inventory.add(ti.StrHelmet)
     bob = bob.equip("mainhand", ti.Sword)
-    bob = bob.equip("mainhand", ti.Dagger)
     bob = bob.equip("head", ti.StrHelmet)
 
     return alice, bob

@@ -56,8 +56,6 @@ class DialogLine(NamedTuple):
 
 
 class _Lang(NamedTuple):
-    none: str = None
-
     # Dialog
     welcome: str = None
     controls: str = None
@@ -74,6 +72,12 @@ class _Lang(NamedTuple):
     menu_test_combat: str = None
 
     settings_language: str = None
+    
+    equipment_none: str = None
+    
+    item_equip: str = None
+    item_unequip: str = None
+    item_use: str = None
 
     # Combat
     combat: dict[str, str] = None
@@ -128,7 +132,6 @@ def _translate_simple(lang_key: str, sub_dict: dict = None) -> str:
             lang_value = sub_dict[lang_key]
 
         if isinstance(lang_value, str):
-            logger.debug(f"Translated {lang_key} into {lang_value}")
             return lang_value
         elif isinstance(lang_value, dict):
             logger.error(f"Specify key of sub dict {lang_key} with dotted notation")
@@ -147,8 +150,10 @@ def _translate_nest(lang_key: str, sub_dict: dict = None) -> str:
     """
     Calls _translate_simple recursively (if it has to) for dicts in lang by
     using dotted notation in the lang key, like
-    _translate_single("item_names.agi_boots").
+    _translate_nest("item_names.agi_boots").
     """
+    logger.debug(f"Translating {lang_key}")
+    
     if SUB_DICT_SEPARATOR in lang_key:
         sub_dict_name, sub_dict_key = lang_key.split(SUB_DICT_SEPARATOR, 1)
         if sub_dict is None:
@@ -185,8 +190,6 @@ def f(fstring: str, *args: object) -> str:
 logger = logging.getLogger(__name__)
 
 ENGLISH = _Lang(
-    none = "None",
-
     # Dialog
     welcome = "Welcome adventurer ! ...asdf. \n(press Space or Enter)",
     controls = "Controls:\n\nUp: W    Down: S    Left: A    Right: D\nConfirm: Space/Enter    Menu: M",
@@ -203,6 +206,12 @@ ENGLISH = _Lang(
     menu_test_combat = "Start combat test",
 
     settings_language = "Language",
+    
+    equipment_none = "None",
+    
+    item_equip = "Equip",
+    item_unequip = "Unequip",
+    item_use = "Use",
 
     # Combat
     combat = {
@@ -276,8 +285,6 @@ ENGLISH = _Lang(
 )
 
 FRENCH = _Lang(
-    none = "Aucun",
-
     # Dialog
     welcome = "Bienvenue aventurier ! ...asdf. \n(appuyez sur Espace ou Entrée)",
     controls = "Controles:\n\nHaut: W    Bas: S    Gauche: A    Droite: D\nConfirmer: Space/Enter    Menu: M",
@@ -294,6 +301,12 @@ FRENCH = _Lang(
     menu_test_combat = "Commencer combat de test",
 
     settings_language = "Langue",
+
+    equipment_none = "Aucun",
+
+    item_equip = "Équiper",
+    item_unequip = "Déséquiper",
+    item_use = "Utiliser",
 
     # Combat
     combat = {
@@ -329,9 +342,10 @@ FRENCH = _Lang(
     item_names = {
       # "item_name": "Item Name",
         "agi_boots": "Bottes de Hermes",
-        "potion_health": "Potion de Gueérisson",
+        "potion_health": "Potion de Guérison",
         "str_helmet": "Heaume de Force",
         "sword": "Épée",
+        "dagger": "Dague",
     },
     item_descriptions = {
     #   "item_name": "Item Description",
@@ -339,6 +353,7 @@ FRENCH = _Lang(
         "potion_health": "Guérit ♥ 5 lors de consommation",
         "str_helmet": "Une heaume spartane, enchantée avec un sort de force",
         "sword": "Un truc pointu",
+        "dagger": "Un autre truc pointu",
     },
 
     # Actions
