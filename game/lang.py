@@ -47,6 +47,7 @@ class DialogLine(NamedTuple):
         and len(dialog_line) == 2
         and isinstance(dialog_line[0], str)
         and isinstance(dialog_line[1], str)):
+            logger.debug(dialog_line)
             return DialogLine(
                 translate(dialog_line[0]),
                 translate("character_names." + dialog_line[1]),
@@ -138,18 +139,22 @@ def _translate_nest(lang_key: str, sub_dict: dict = None) -> str:
     Returns:
         The translated string.
     """
-    if SUB_DICT_SEPARATOR in lang_key:
-        sub_dict_name, sub_dict_key = lang_key.split(SUB_DICT_SEPARATOR, 1)
-        if sub_dict is None:
-            lang_text = LANGUAGES[settings.get().language]
-            next_sub_dict = getattr(lang_text, sub_dict_name)
-        else:
-            next_sub_dict = sub_dict[sub_dict_name]
+    try:
+        if SUB_DICT_SEPARATOR in lang_key:
+            sub_dict_name, sub_dict_key = lang_key.split(SUB_DICT_SEPARATOR, 1)
+            if sub_dict is None:
+                lang_text = LANGUAGES[settings.get().language]
+                next_sub_dict = getattr(lang_text, sub_dict_name)
+            else:
+                next_sub_dict = sub_dict[sub_dict_name]
 
-        return _translate_nest(
-            sub_dict_key,
-            next_sub_dict,
-        )
+            return _translate_nest(
+                sub_dict_key,
+                next_sub_dict,
+            )
+
+    except (AttributeError, KeyError, ValueError):
+        logger.warning(f"Selected language doesn't contain {lang_key}, using that instead")
 
     return _translate_simple(lang_key, sub_dict)
 

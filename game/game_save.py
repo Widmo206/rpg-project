@@ -38,8 +38,8 @@ class GameSave(NamedTuple):
 
     @classmethod
     def new(cls, character: Character = monsters.player(),
-            zone_path: str = DEFAULT_ZONE_PATH, player_grid_y: int = 3,
-            player_grid_x: int = 5) -> GameSave:
+            zone_path: str = DEFAULT_ZONE_PATH, player_grid_y: int = 4,
+            player_grid_x: int = 6) -> GameSave:
         logger.debug("Creating new GameSave")
 
         return cls(
