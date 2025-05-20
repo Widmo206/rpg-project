@@ -38,13 +38,13 @@ class ItemNotFoundError(ValueError):
     """Raised when an item was expected but None was provided."""
     pass
 class IncompatibleSlotError(ValueError):
-    """raised when an item is inserted in an incorrect slot."""
+    """Raised when an item is inserted into an incorrect slot."""
     pass
 class TaskNotFoundError(ValueError):
-    """raised by an Inventory.tasklist when referencing a nonexistant task."""
+    """Raised by an Inventory.tasklist when referencing a nonexistant task."""
     pass
 class CharacterNotFoundError(ValueError):
-    """Raised when a character with the given UUID doesn't exist"""
+    """Raised when a character with the given UUID doesn't exist."""
     pass
 class UnknownActionTypeError(ValueError):
     """Raised when an Action with an invalid type was provided."""
@@ -83,7 +83,7 @@ class Stats(NamedTuple):
     def get_placeholder() -> Stats:
         """Generate a placeholder stat block.
 
-        Intended as a fallback when there's no access to the stats of a real Character.
+        Intended as a fallback when there's no access to the Stats of a real Character.
         """
         # It took me so fucking long to realize I forgot to return
         return Stats( 20,  50,   0,  10,  10,  10,   2,   4)
@@ -140,6 +140,7 @@ class Action(NamedTuple):
 
     @auto_integer
     def get_damage(self, source_item: Item, user_stats: Stats) -> float:
+        """Calculate the damage of an Action."""
         if user_stats is None:
             logger.info(f" No user_stats were provided for use of Action <{self.name}>; using default values")
             user_stats = Stats.get_placeholder()
@@ -183,6 +184,7 @@ class Action(NamedTuple):
 
 
     def create_damage_instance(self) -> DamageInstance:
+        """Create a DamageInstance as a result of the Action being performed."""
         return DamageInstance(self.damage(), self.damage_type, self.effects)
 
 
@@ -191,10 +193,15 @@ class Action(NamedTuple):
 
 
     def display(self, source_item: Item, actor: Character=None):
+        """Return a representation of the Action, complete with calculated damage."""
         return f"{self.display_name} (¤ {round(self.get_damage(source_item, actor), 1)})"
 
 
 class Item(NamedTuple):
+    """Holds information about an item.
+
+    Use Item.new() instead of the default constructor.
+    """
     name: str = None                # Internal name; english only
 
     tags: tuple[str] = None
@@ -322,7 +329,7 @@ class Inventory(NamedTuple):
             else:
                 continue
 
-        # Dumb equipment to the log before throwing exception
+        # Dump equipment to the log before throwing exception
         logger.warning(f"Could not find item {item_uuid} in this Inventory.equipment\n\nCurrent Equipment:\n{self._get_equipment_dump()}\n")
         raise ItemNotFoundError( f"Could not find item {item_uuid} in this Inventory.equipment")
 
@@ -510,6 +517,7 @@ class Character(NamedTuple):
 
     @property
     def display_name(self) -> str:
+        """Fetch the character's name in the appropriate language."""
         return translate("character_names." + self.name)
 
 
@@ -602,6 +610,10 @@ class Character(NamedTuple):
 
 
     def update_stats(self) -> Stats:
+        """Update the Character's Stats based on available bonuses.
+
+        Remember to replace the Character instance with the modified one.
+        """
         new_stats = []
 
         for i, stat in enumerate(self.base):
@@ -682,6 +694,7 @@ class Character(NamedTuple):
 
 
 class Party(NamedTuple):
+    """Bundles several Characters into a single entity."""
     name: str
     members: tuple[Character]
     leader: UUID
