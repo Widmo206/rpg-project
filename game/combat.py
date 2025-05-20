@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Combat mechanic prototype.
 
 Handles the core logic for turn-based battles, party management, and interactions
@@ -77,7 +78,7 @@ class CombatParty(NamedTuple):
         return Party(name, tuple(members), leader)
 
     def get_member(self, member_uuid: UUID) -> Character:
-        """Get a Character by their UUID, or raise if not present."""
+        """Get a Character by their UUID, or raise an error if not present."""
         if self.has_member(member_uuid):
             char = self.members[member_uuid][0]
             # logger.debug(f" {self.name} - found member {char}")
@@ -245,7 +246,11 @@ class Battle(NamedTuple):
         return action, weapon, enemy_uuid
 
     def begin(self) -> None:
-        """Start the battle loop, handling turns until completion."""
+        """Finish Battle setup.
+
+        If the script is executed on its own (for testing), begin() will start
+        the battle loop.
+        """
         logger.info("Battle started")
         self.output(f"{translate('combat.begin')}\n\n{self}")
 
@@ -256,6 +261,7 @@ class Battle(NamedTuple):
 
         if is_main:
             while is_fight_on:
+                # I don't think we even need the loop
                 try:
                     self.advance(None)
                 except FightOver:
@@ -304,7 +310,15 @@ class Battle(NamedTuple):
             return 0
 
     def advance(self, player_choice: tuple[Action, Item, UUID] = None) -> EnumObject:
-        """Advance the battle by one action (player or NPC)."""
+        """Advance the battle until a player action is required.
+
+        If called externally, the loops will stop and return the dialogs and
+        choices to be displayed to the player.
+
+        If the script is executed on its own (for testing), player input will be
+        handled directly in the console and the loop will continue until the battle
+        ends.
+        """
         player_action_resolved = False
 
         while True:
@@ -321,14 +335,19 @@ class Battle(NamedTuple):
                 logger.info(f"{fighter} starts their turn")
 
                 if fighter.is_player:
+                    # Handle player input
                     if player_action_resolved or player_choice is None:
+                        # Already handled the action we received OR haven't
+                        # received anything yet
                         if __name__ == "__main__":
+                            # running a test -> ask directly in console
                             attack, weapon, target_uuid = self.get_player_action(
                                 fighter,
                                 allies,
                                 enemies
                             )
                         else:
+                            # running in-game -> interrupt the combat to ask for input
                             target_choice_event = self.get_target_choice_event(enemies)
                             action_choice_event = self.get_action_choice_event(fighter)
                             self.return_dialog.append(target_choice_event)
@@ -338,10 +357,12 @@ class Battle(NamedTuple):
                             return dialog_event
 
                     else:
+                        # Continue combat after receiving player input (main)
                         attack, weapon, target_uuid = player_choice
                         player_action_resolved = True
 
                 else:
+                    # Handle NPC actions
                     attack_action_source, attack = r.choice(fighter.actions)
                     target_uuid = r.choice(enemies.valid_targets)
                     weapon = fighter.inventory.find_equipped_item(attack_action_source)
@@ -374,7 +395,7 @@ class Battle(NamedTuple):
                     damage_dealt,
                     target.health,
                 )
-                
+
 
                 allies.update_member(fighter_uuid, fighter)
                 enemies.update_member(target_uuid, target)
