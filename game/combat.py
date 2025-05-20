@@ -383,6 +383,7 @@ class Battle(NamedTuple):
                     logger.info(f"{target.name} dies")
                     output += "\n\n"
                     output += f(translate("combat.death"), target.display_name)
+                    self.output(output)
 
                     match self.check_win_loss_conditions():
                         case 0:
