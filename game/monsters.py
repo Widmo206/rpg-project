@@ -33,7 +33,8 @@ class DefaultStats(NamedTuple):
     goblin_chief = Stats( 20,  30,   5,  10,   8,   5,   4,   4)
 
 
-def player():
+def player() -> Character:
+    """Create a character from preset player."""
     char = Character.new(
         name            = "player",
         sprite_sheet    = load_text_dir(PLAYER_SPRITE_DIR_PATH),
@@ -54,7 +55,8 @@ def player():
     return char
 
 
-def goblin():
+def goblin() -> Character:
+    """Create a character from preset goblin."""
     char = Character.new(
         name            = "goblin",
         sprite_sheet    = None,
@@ -68,7 +70,8 @@ def goblin():
     return char
 
 
-def hobgoblin():
+def hobgoblin() -> Character:
+    """Create a character from preset hobgoblin."""
     char = Character.new(
         name            = "hobgoblin",
         sprite_sheet    = None,
@@ -83,7 +86,8 @@ def hobgoblin():
     return char
 
 
-def goblin_chief():
+def goblin_chief() -> Character:
+    """Create a character from preset goblin_chief."""
     char = Character.new(
         name            = "goblin_chief",
         sprite_sheet    = None,
@@ -97,7 +101,8 @@ def goblin_chief():
     return char
 
 
-def bandit():
+def bandit() -> Character:
+    """Create a character from preset bandit."""
     char = Character.new(
         name            = "bandit",
         sprite_sheet    = None,
@@ -111,7 +116,7 @@ def bandit():
     return char
 
 
-def _test():
+def _test() -> None:
     """Execute a series of test to see if the program is working"""
     test_monster_1 = goblin()
     test_monster_2 = hobgoblin()

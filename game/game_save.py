@@ -25,7 +25,7 @@ class GameSave(NamedTuple):
     player_grid_x: int
 
     @staticmethod
-    def _test():
+    def _test() -> None:
         """Execute a series of test to see if the program is working"""
         test_save1 = GameSave.new(player_grid_x = 5, player_grid_y = 10)
         test_save2 = GameSave.new(player_grid_x = 3, player_grid_y = 7)
@@ -40,6 +40,7 @@ class GameSave(NamedTuple):
     def new(cls, character: Character = monsters.player(),
             zone_path: str = DEFAULT_ZONE_PATH, player_grid_y: int = 4,
             player_grid_x: int = 6) -> GameSave:
+        """Create a new GameSave with provided attributes or defaults."""
         logger.debug("Creating new GameSave")
 
         return cls(

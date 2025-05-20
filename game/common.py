@@ -15,6 +15,15 @@ from typing import NamedTuple, Callable
 logger = logging.getLogger(__name__)
 
 
+class EnumObject(NamedTuple):
+    """Store an object with an associated int.
+
+    Usually used to define how the object is used, such as in events and world objects.
+    """
+    enum: int
+    value: object = None
+
+
 def auto_integer(func: Callable) -> Callable:
     """Convert output of func to int if appropriate."""
     def wrapper(*args, **kwargs):
@@ -24,15 +33,6 @@ def auto_integer(func: Callable) -> Callable:
                 return int(result)
         return result
     return wrapper
-
-
-class EnumObject(NamedTuple):
-    """Store an object with an associated int.
-
-    Usually used to define how the object is used, such as in events and world objects.
-    """
-    enum: int
-    value: object = None
 
 
 def named_tuple_modifier(data_type: Callable, old_data: NamedTuple, **changes) -> NamedTuple:
@@ -73,7 +73,7 @@ def try_sleep(sleep_time: int) -> None:
         time.sleep(sleep_time)
 
 
-def _test():
+def _test() -> None:
     """Execute a series of test to see if the program is working"""
     time_test_1 = time.time()
     try_sleep(1)
@@ -88,5 +88,4 @@ def _test():
 
 
 if __name__ == "__main__":
-    # Tests
     _test()

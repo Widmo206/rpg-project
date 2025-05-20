@@ -91,7 +91,7 @@ def _make_setting_manager() -> tuple[Callable, ...]:
     )
 
 
-def _test():
+def _test() -> None:
     """Test suite for the settings manager."""
     assert get().language == LANGUAGE_ENUM.ENGLISH
     config(language=LANGUAGE_ENUM.FRENCH)

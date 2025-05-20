@@ -73,7 +73,7 @@ def delete(path: str) -> None:
     os.remove(path)
 
 
-def _test():
+def _test() -> None:
     """Execute a series of test to see if the program is working"""
     file_1 = "10"
     save_pickle(file_1, "test")

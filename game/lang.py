@@ -195,7 +195,7 @@ def f(fstring: str, *args: object) -> str:
     return fstring.format(*args)
 
 
-def _test():
+def _test() -> None:
     """Test translations for integrity."""
     assert FRENCH.action_descriptions["slash"] == "Brandissez votre épée sur votre ennemi"
     assert _translate_simple("feet", ENGLISH.equipment_slots) == "Feet"

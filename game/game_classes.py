@@ -447,7 +447,7 @@ class Inventory(NamedTuple):
 
 
     @staticmethod
-    def _test():
+    def _test() -> None:
         item1 = Item.new("item1", ("head", "equippable"), 1, Stats(), tuple())
         item2 = Item.new("item2", ("item",), 1, Stats(), tuple())
         item3 = Item.new("item3", ("head", "equippable"), 1, Stats(), tuple())
