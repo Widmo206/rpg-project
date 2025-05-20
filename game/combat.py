@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Combat mechanic prototype.
 
 Handles the core logic for turn-based battles, party management, and interactions
@@ -321,14 +322,19 @@ class Battle(NamedTuple):
                 logger.info(f"{fighter} starts their turn")
 
                 if fighter.is_player:
+                    # Handle player input
                     if player_action_resolved or player_choice is None:
+                        # Already handled the action we received OR haven't
+                        # received anything yet
                         if __name__ == "__main__":
+                            # running a test -> ask directly in console
                             attack, weapon, target_uuid = self.get_player_action(
                                 fighter,
                                 allies,
                                 enemies
                             )
                         else:
+                            # running in-game -> interrupt the combat to ask for input
                             target_choice_event = self.get_target_choice_event(enemies)
                             action_choice_event = self.get_action_choice_event(fighter)
                             self.return_dialog.append(target_choice_event)
@@ -338,10 +344,12 @@ class Battle(NamedTuple):
                             return dialog_event
 
                     else:
+                        # Continue combat after receiving player input (main)
                         attack, weapon, target_uuid = player_choice
                         player_action_resolved = True
 
                 else:
+                    # Handle NPC actions
                     attack_action_source, attack = r.choice(fighter.actions)
                     target_uuid = r.choice(enemies.valid_targets)
                     weapon = fighter.inventory.find_equipped_item(attack_action_source)
@@ -374,7 +382,7 @@ class Battle(NamedTuple):
                     damage_dealt,
                     target.health,
                 )
-                
+
 
                 allies.update_member(fighter_uuid, fighter)
                 enemies.update_member(target_uuid, target)
