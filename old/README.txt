@@ -1,0 +1,1 @@
+These folders contain code from before we merged groups RPG and 3D (respectively back-end and front-end). Not really for review, but we thought it would be nice to include it.
