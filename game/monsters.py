@@ -111,7 +111,13 @@ def bandit():
     return char
 
 
+def _test():
+    """Execute a series of test to see if the program is working"""
+    test_monster_1 = goblin()
+    test_monster_2 = hobgoblin()
+    assert test_monster_1.name == "goblin" and test_monster_2.base == DefaultStats.hobgoblin
+    print("All tests passed")
+
+
 if __name__ == "__main__":
-    print(goblin())
-    print(hobgoblin())
-    print(goblin_chief())
+    _test()
