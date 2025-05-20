@@ -78,7 +78,7 @@ class CombatParty(NamedTuple):
         return Party(name, tuple(members), leader)
 
     def get_member(self, member_uuid: UUID) -> Character:
-        """Get a Character by their UUID, or raise if not present."""
+        """Get a Character by their UUID, or raise an error if not present."""
         if self.has_member(member_uuid):
             char = self.members[member_uuid][0]
             # logger.debug(f" {self.name} - found member {char}")
@@ -246,7 +246,11 @@ class Battle(NamedTuple):
         return action, weapon, enemy_uuid
 
     def begin(self) -> None:
-        """Start the battle loop, handling turns until completion."""
+        """Finish Battle setup.
+
+        If the script is executed on its own (for testing), begin() will start
+        the battle loop.
+        """
         logger.info("Battle started")
         self.output(f"{translate('combat.begin')}\n\n{self}")
 
@@ -257,6 +261,7 @@ class Battle(NamedTuple):
 
         if is_main:
             while is_fight_on:
+                # I don't think we even need the loop
                 try:
                     self.advance(None)
                 except FightOver:
@@ -305,7 +310,15 @@ class Battle(NamedTuple):
             return 0
 
     def advance(self, player_choice: tuple[Action, Item, UUID] = None) -> EnumObject:
-        """Advance the battle by one action (player or NPC)."""
+        """Advance the battle until a player action is required.
+
+        If called externally, the loops will stop and return the dialogs and
+        choices to be displayed to the player.
+
+        If the script is executed on its own (for testing), player input will be
+        handled directly in the console and the loop will continue until the battle
+        ends.
+        """
         player_action_resolved = False
 
         while True:
